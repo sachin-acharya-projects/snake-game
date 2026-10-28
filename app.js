@@ -1,30 +1,28 @@
 (() => {
   "use strict";
 
-  const canvas = document.querySelector("#snake");
-  const context = canvas.getContext("2d");
-  const scoreElement = document.querySelector(".scoreboard span");
-  const gameOverScreen = document.querySelector(".reloader");
-  const finalScoreElement = document.querySelector(".highScore");
-  const restartButton = document.querySelector(".reloading");
+  const gameCanvas = document.querySelector("#game-board");
+  const canvasContext = gameCanvas.getContext("2d");
+  const scoreValue = document.querySelector(".score-value");
+  const gameOverOverlay = document.querySelector(".game-over");
+  const finalScoreValue = document.querySelector(".game-over__score");
+  const restartButton = document.querySelector(".game-over__restart");
 
   const CELL_SIZE = 32;
   const BOARD_SIZE = 608;
-  const TICK_RATE = 100;
-  const BOUNDS = {
+  const GAME_TICK_MS = 100;
+
+  const BOARD_BOUNDS = {
     left: CELL_SIZE,
     right: 17 * CELL_SIZE,
     top: 3 * CELL_SIZE,
     bottom: 17 * CELL_SIZE,
   };
 
-  const images = {
-    food: loadImage("img/food.png"),
-    ground: loadImage("img/ground.png"),
-  };
+  const foodImage = loadImage("img/food.png");
 
-  const sounds = {
-    dead: loadAudio("audio/dead.mp3"),
+  const soundEffects = {
+    gameOver: loadAudio("audio/dead.mp3"),
     eat: loadAudio("audio/eat.mp3"),
     up: loadAudio("audio/up.mp3"),
     right: loadAudio("audio/right.mp3"),
@@ -32,207 +30,229 @@
     left: loadAudio("audio/left.mp3"),
   };
 
-  const directions = {
+  const MOVEMENT_DIRECTIONS = {
     ArrowUp: { x: 0, y: -1, sound: "up", opposite: "ArrowDown" },
     ArrowRight: { x: 1, y: 0, sound: "right", opposite: "ArrowLeft" },
     ArrowDown: { x: 0, y: 1, sound: "down", opposite: "ArrowUp" },
     ArrowLeft: { x: -1, y: 0, sound: "left", opposite: "ArrowRight" },
   };
 
-  let snake;
-  let food;
-  let direction = null;
-  let nextDirection = null;
+  let snakeSegments = [];
+  let foodPosition = null;
+  let currentDirection = null;
+  let queuedDirection = null;
   let score = 0;
-  let gameTimer = null;
-  let gameOver = false;
+  let gameIntervalId = null;
+  let isGameOver = false;
 
-  function loadImage(source) {
+  function loadImage(sourcePath) {
     const image = new Image();
-    image.src = source;
+    image.src = sourcePath;
     return image;
   }
 
-  function loadAudio(source) {
-    const audio = new Audio(source);
+  function loadAudio(sourcePath) {
+    const audio = new Audio(sourcePath);
     audio.preload = "auto";
     return audio;
   }
 
-  function playSound(name) {
-    const audio = sounds[name];
+  function playSoundEffect(effectName) {
+    const audio = soundEffects[effectName];
     if (!audio) return;
 
-    // Reset short sound effects so they can play again immediately.
     audio.currentTime = 0;
     const playback = audio.play();
-    if (playback) playback.catch(() => {
-      // Browsers may block audio until the user interacts with the page.
-    });
+
+    if (playback) {
+      playback.catch(() => {
+        // Audio may be blocked until the player interacts with the page.
+      });
+    }
   }
 
-  function randomGridPosition() {
+  function getRandomBoardPosition() {
     return {
       x: (Math.floor(Math.random() * 17) + 1) * CELL_SIZE,
       y: (Math.floor(Math.random() * 15) + 3) * CELL_SIZE,
     };
   }
 
-  function positionsMatch(first, second) {
-    return first.x === second.x && first.y === second.y;
+  function arePositionsEqual(firstPosition, secondPosition) {
+    return (
+      firstPosition.x === secondPosition.x &&
+      firstPosition.y === secondPosition.y
+    );
   }
 
-  function placeFood() {
-    let position;
+  function generateFoodPosition() {
+    let candidatePosition;
 
     do {
-      position = randomGridPosition();
-    } while (snake.some((segment) => positionsMatch(segment, position)));
+      candidatePosition = getRandomBoardPosition();
+    } while (
+      snakeSegments.some((segment) =>
+        arePositionsEqual(segment, candidatePosition),
+      )
+    );
 
-    return position;
+    return candidatePosition;
   }
 
-  function resetGame() {
-    if (gameTimer !== null) {
-      clearInterval(gameTimer);
+  function startNewGame() {
+    if (gameIntervalId !== null) {
+      clearInterval(gameIntervalId);
     }
 
-    snake = [{ x: 9 * CELL_SIZE, y: 10 * CELL_SIZE }];
-    direction = null;
-    nextDirection = null;
+    snakeSegments = [{ x: 9 * CELL_SIZE, y: 10 * CELL_SIZE }];
+    foodPosition = null;
+    currentDirection = null;
+    queuedDirection = null;
     score = 0;
-    gameOver = false;
-    food = placeFood();
+    isGameOver = false;
+    foodPosition = generateFoodPosition();
 
-    scoreElement.textContent = String(score);
-    gameOverScreen.classList.remove("open");
-    render();
-    gameTimer = setInterval(update, TICK_RATE);
+    scoreValue.textContent = String(score);
+    gameOverOverlay.classList.remove("is-visible");
+    renderGame();
+
+    gameIntervalId = setInterval(updateGame, GAME_TICK_MS);
   }
 
-  function handleKeydown(event) {
-    const requestedDirection = directions[event.key];
-    if (!requestedDirection || gameOver) return;
+  function handleDirectionInput(event) {
+    const requestedDirection = MOVEMENT_DIRECTIONS[event.key];
+    if (!requestedDirection || isGameOver) return;
 
     event.preventDefault();
 
-    const currentDirection = nextDirection || direction;
-    if (currentDirection && requestedDirection.opposite === currentDirection) {
+    const activeDirection = queuedDirection || currentDirection;
+    if (
+      activeDirection &&
+      requestedDirection.opposite === activeDirection
+    ) {
       return;
     }
 
-    nextDirection = event.key;
-    playSound(requestedDirection.sound);
+    queuedDirection = event.key;
+    playSoundEffect(requestedDirection.sound);
   }
 
   function isOutsideBoard(position) {
     return (
-      position.x < BOUNDS.left ||
-      position.x > BOUNDS.right ||
-      position.y < BOUNDS.top ||
-      position.y > BOUNDS.bottom
+      position.x < BOARD_BOUNDS.left ||
+      position.x > BOARD_BOUNDS.right ||
+      position.y < BOARD_BOUNDS.top ||
+      position.y > BOARD_BOUNDS.bottom
     );
   }
 
-  function endGame() {
-    gameOver = true;
-    clearInterval(gameTimer);
-    gameTimer = null;
+  function finishGame() {
+    isGameOver = true;
+    clearInterval(gameIntervalId);
+    gameIntervalId = null;
 
-    finalScoreElement.textContent = `Score: ${score}`;
-    gameOverScreen.classList.add("open");
-    playSound("dead");
+    finalScoreValue.textContent = `Final score: ${score}`;
+    gameOverOverlay.classList.add("is-visible");
+    playSoundEffect("gameOver");
   }
 
-  function update() {
-    if (gameOver) return;
+  function updateGame() {
+    if (isGameOver) return;
 
-    if (nextDirection) {
-      direction = nextDirection;
-      nextDirection = null;
+    if (queuedDirection) {
+      currentDirection = queuedDirection;
+      queuedDirection = null;
     }
 
-    // Wait for the first valid direction before moving.
-    if (!direction) {
-      render();
+    // Keep the snake still until the player chooses an initial direction.
+    if (!currentDirection) {
+      renderGame();
       return;
     }
 
-    const movement = directions[direction];
-    const head = {
-      x: snake[0].x + movement.x * CELL_SIZE,
-      y: snake[0].y + movement.y * CELL_SIZE,
+    const movement = MOVEMENT_DIRECTIONS[currentDirection];
+    const nextHeadPosition = {
+      x: snakeSegments[0].x + movement.x * CELL_SIZE,
+      y: snakeSegments[0].y + movement.y * CELL_SIZE,
     };
-    const ateFood = positionsMatch(head, food);
+    const willEatFood = arePositionsEqual(nextHeadPosition, foodPosition);
 
-    // The tail moves away on a normal step, so it is not a collision target.
-    const bodyToCheck = ateFood ? snake : snake.slice(0, -1);
-    if (
-      isOutsideBoard(head) ||
-      bodyToCheck.some((segment) => positionsMatch(head, segment))
-    ) {
-      endGame();
-      render();
+    // On a normal move the tail vacates its cell, so exclude it from collision checks.
+    const collisionSegments = willEatFood
+      ? snakeSegments
+      : snakeSegments.slice(0, -1);
+
+    const hitsSnake = collisionSegments.some((segment) =>
+      arePositionsEqual(nextHeadPosition, segment),
+    );
+
+    if (isOutsideBoard(nextHeadPosition) || hitsSnake) {
+      finishGame();
+      renderGame();
       return;
     }
 
-    snake.unshift(head);
+    snakeSegments.unshift(nextHeadPosition);
 
-    if (ateFood) {
+    if (willEatFood) {
       score += 1;
-      scoreElement.textContent = String(score);
-      playSound("eat");
-      food = placeFood();
+      scoreValue.textContent = String(score);
+      playSoundEffect("eat");
+      foodPosition = generateFoodPosition();
     } else {
-      snake.pop();
+      snakeSegments.pop();
     }
 
-    render();
+    renderGame();
   }
 
-  function render() {
-    context.fillStyle = "#000";
-    context.fillRect(0, 0, BOARD_SIZE, BOARD_SIZE);
+  function renderGame() {
+    canvasContext.fillStyle = "#000";
+    canvasContext.fillRect(0, 0, BOARD_SIZE, BOARD_SIZE);
 
-    // Keep the original dark header strip at the top of the playfield.
-    context.fillStyle = "#030327";
-    context.fillRect(0, 0, BOARD_SIZE, 1.6 * CELL_SIZE);
+    canvasContext.fillStyle = "#030327";
+    canvasContext.fillRect(0, 0, BOARD_SIZE, 1.6 * CELL_SIZE);
 
     drawFood();
     drawSnake();
   }
 
   function drawFood() {
-    if (images.food.complete && images.food.naturalWidth > 0) {
-      context.drawImage(images.food, food.x, food.y, CELL_SIZE, CELL_SIZE);
+    if (foodImage.complete && foodImage.naturalWidth > 0) {
+      canvasContext.drawImage(
+        foodImage,
+        foodPosition.x,
+        foodPosition.y,
+        CELL_SIZE,
+        CELL_SIZE,
+      );
       return;
     }
 
-    context.fillStyle = "red";
-    context.beginPath();
-    context.arc(
-      food.x + CELL_SIZE / 2,
-      food.y + CELL_SIZE / 2,
+    canvasContext.fillStyle = "#ef4444";
+    canvasContext.beginPath();
+    canvasContext.arc(
+      foodPosition.x + CELL_SIZE / 2,
+      foodPosition.y + CELL_SIZE / 2,
       CELL_SIZE / 3,
       0,
       Math.PI * 2,
     );
-    context.fill();
+    canvasContext.fill();
   }
 
   function drawSnake() {
-    snake.forEach((segment, index) => {
-      context.fillStyle = index === 0 ? "#22c55e" : "#fff";
-      context.fillRect(
+    snakeSegments.forEach((segment, index) => {
+      canvasContext.fillStyle = index === 0 ? "#22c55e" : "#fff";
+      canvasContext.fillRect(
         segment.x,
         segment.y,
         CELL_SIZE,
         CELL_SIZE,
       );
 
-      // A small gap makes each segment easier to distinguish.
-      context.strokeStyle = "#000";
-      context.strokeRect(
+      canvasContext.strokeStyle = "#000";
+      canvasContext.strokeRect(
         segment.x,
         segment.y,
         CELL_SIZE,
@@ -241,8 +261,8 @@
     });
   }
 
-  document.addEventListener("keydown", handleKeydown);
-  restartButton.addEventListener("click", resetGame);
+  document.addEventListener("keydown", handleDirectionInput);
+  restartButton.addEventListener("click", startNewGame);
 
-  resetGame();
+  startNewGame();
 })();
