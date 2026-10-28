@@ -1,88 +1,79 @@
 # Snake Game
 
-A classic Snake game built with **HTML, CSS, and vanilla JavaScript**. Move the snake around the board, eat food to grow, and try to get the highest score before hitting a wall or yourself.
+A classic Snake game built with **HTML, CSS, and vanilla JavaScript**. Move the snake around the board, eat food to grow, and avoid colliding with the walls or your own body.
 
 ## Features
 
-- Classic grid-based Snake gameplay rendered with the HTML Canvas API
-- Keyboard controls with prevention of immediate 180-degree turns
-- Score counter that increases whenever food is eaten
+- Grid-based gameplay rendered with the HTML Canvas API
+- Arrow-key controls that prevent immediate 180-degree turns
+- Score counter and growing snake
 - Sound effects for movement, eating, and game over
-- Game-over screen with your score and a reload button
-- No frameworks, package manager, or build step required
+- Game-over overlay with a restart button
+- Responsive layout and no build step or third-party dependencies
 
 ## Getting Started
 
-### Play locally
+### Run locally
 
-1. Clone the repository:
+Clone the repository:
 
-   ```bash
-   git clone https://github.com/sachin-acharya-projects/snake-game.git
-   cd snake-game
-   ```
+```bash
+git clone https://github.com/sachin-acharya-projects/snake-game.git
+cd snake-game
+```
 
-2. Open `index.html` in your web browser.
+Open `index.html` in your browser. No dependency installation is required.
 
-That is it—there are no dependencies to install.
-
-### Run with a local server (optional)
-
-You can also serve the project with any static file server. For example, if Python is installed:
+Alternatively, run a local static server with Python:
 
 ```bash
 python -m http.server 8000
 ```
 
-Then open [http://localhost:8000](http://localhost:8000).
+Then visit [http://localhost:8000](http://localhost:8000).
 
 ## How to Play
 
 | Key | Action |
 | --- | --- |
-| <kbd>↑</kbd> / <kbd>W</kbd>* | Move up |
-| <kbd>↓</kbd> / <kbd>S</kbd>* | Move down |
-| <kbd>←</kbd> / <kbd>A</kbd>* | Move left |
-| <kbd>→</kbd> / <kbd>D</kbd>* | Move right |
+| `↑` | Move up |
+| `↓` | Move down |
+| `←` | Move left |
+| `→` | Move right |
 
-`*` The current implementation uses the arrow keys; WASD support is not implemented yet.
-
-- Eat the food to increase your score and grow longer.
-- Avoid the board boundaries and the snake's own body.
-- When the game ends, select **RELOAD** to start a new round.
+- Eat food to increase your score and grow the snake.
+- Avoid the board boundaries and the snake's body.
+- Select **PLAY AGAIN** after game over to restart.
 
 ## Project Structure
 
 ```text
 snake-game/
-├── index.html   # Game page, canvas, score display, and game-over overlay
-├── style.css    # Layout and visual styling
-├── app.js       # Game loop, movement, collisions, scoring, and audio
+├── index.html   # Game markup and canvas
+├── style.css    # Responsive layout and component styles
+├── app.js       # Game state, controls, collision checks, and rendering
+├── LICENSE      # MIT License
 ├── img/         # Food and other image assets
-└── audio/       # Movement, eating, and game-over sound effects
+└── audio/       # Game sound effects
 ```
 
 ## Built With
 
-- **HTML5** — page structure and game canvas
-- **CSS3** — layout and styling
-- **JavaScript** — game logic and animation loop
-- **Canvas API** — drawing the board, snake, and food
-- **HTML Audio API** — sound effects
-
-## How It Works
-
-The game runs a loop approximately every 100 milliseconds. Each update draws the board, moves the snake in its current direction, checks whether food has been eaten, updates the score and snake length, and detects collisions. The game stops when the snake hits a boundary or its own body.
+- **HTML5** for document structure and the canvas element
+- **CSS3** for layout and responsive styling
+- **JavaScript** for game state, controls, and game logic
+- **Canvas API** for rendering the board, snake, and food
+- **HTML Audio API** for sound effects
 
 ## Contributing
 
-Ideas, bug fixes, and improvements are welcome. To contribute:
+Bug fixes and improvements are welcome:
 
 1. Fork the repository.
 2. Create a branch for your change.
-3. Make and test your changes in a browser.
-4. Open a pull request describing what changed.
+3. Test the game in a browser.
+4. Open a pull request describing your changes.
 
 ## License
 
-No license is currently specified in this repository. Unless a license is added, the default copyright rules apply and reuse may be restricted.
+This project is licensed under the [MIT License](./LICENSE).
