@@ -13,10 +13,10 @@
   const GAME_TICK_MS = 100;
 
   const BOARD_BOUNDS = {
-    left: CELL_SIZE,
-    right: 17 * CELL_SIZE,
-    top: 3 * CELL_SIZE,
-    bottom: 17 * CELL_SIZE,
+    left: 0,
+    right: BOARD_SIZE - CELL_SIZE,
+    top: 2 * CELL_SIZE,
+    bottom: BOARD_SIZE - CELL_SIZE,
   };
 
   const foodImage = loadImage("img/food.png");
