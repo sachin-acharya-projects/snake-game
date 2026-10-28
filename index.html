@@ -11,14 +11,14 @@
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <main class="game">
-      <div class="scoreboard" aria-label="Current score">
+    <main class="game-shell">
+      <div class="score-panel" aria-label="Current score">
         <img src="./img/food.png" alt="" />
-        <span aria-live="polite">0</span>
+        <span class="score-value" aria-live="polite">0</span>
       </div>
 
       <canvas
-        id="snake"
+        id="game-board"
         width="608"
         height="608"
         aria-label="Snake game board. Use the arrow keys to move."
@@ -26,10 +26,15 @@
         Your browser does not support the HTML canvas element.
       </canvas>
 
-      <section class="reloader" role="dialog" aria-labelledby="game-over-title" aria-modal="true">
+      <section
+        class="game-over"
+        role="dialog"
+        aria-labelledby="game-over-title"
+        aria-modal="true"
+      >
         <h2 id="game-over-title">GAME OVER</h2>
-        <p class="highScore"></p>
-        <button class="reloading" type="button">PLAY AGAIN</button>
+        <p class="game-over__score"></p>
+        <button class="game-over__restart" type="button">PLAY AGAIN</button>
       </section>
     </main>
 
