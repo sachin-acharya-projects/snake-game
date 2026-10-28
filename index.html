@@ -1,20 +1,43 @@
-<html>
-    <head>
-        <title>Snake Game</title>
-        <link rel="stylesheet" href="./style.css">
-        <style>
-            canvas{
-                display: block;
-                margin: 0 auto;
-            }
-        </style>
-    </head>
-    <div class="reloader">
-        <h2>GAME OVER</h2>
-        <div class="highScore"></div>
-        <button class="reloading">RELOAD</button>
-    </div>
-    <div class="scoreboard"><img src="./img/food.png" alt=""><span></span></div>
-    <canvas id="snake" width="608" height="608"></canvas>
-    <script src="./app.js"></script>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="A classic Snake game built with HTML, CSS, and JavaScript."
+    />
+    <title>Snake Game</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <div class="score-panel" aria-label="Current score">
+        <img src="./img/food.png" alt="" />
+        <span class="score-value" aria-live="polite">0</span>
+      </div>
+
+      <canvas
+        id="game-board"
+        width="608"
+        height="608"
+        aria-label="Snake game board. Use the arrow keys to move."
+      >
+        Your browser does not support the HTML canvas element.
+      </canvas>
+
+      <section
+        class="game-over"
+        role="dialog"
+        aria-labelledby="game-over-title"
+        aria-modal="true"
+      >
+        <h2 id="game-over-title">GAME OVER</h2>
+        <p class="game-over__score"></p>
+        <button class="game-over__restart" type="button">PLAY AGAIN</button>
+      </section>
+    </main>
+
+    <script src="./app.js" defer></script>
+  </body>
 </html>
