@@ -251,13 +251,6 @@
         CELL_SIZE,
       );
 
-      canvasContext.strokeStyle = "#000";
-      canvasContext.strokeRect(
-        segment.x,
-        segment.y,
-        CELL_SIZE,
-        CELL_SIZE,
-      );
     });
   }
 
