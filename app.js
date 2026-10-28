@@ -1,156 +1,248 @@
-const cvs = document.getElementById("snake");
-const ctx = cvs.getContext("2d");
-const reloader = document.querySelector('.reloader')
-const highScore = document.querySelector('.highScore');
-const scoreboard = document.querySelector(".scoreboard span");
-const reloading = document.querySelector('.reloading');
-reloading.addEventListener('click', ()=>{
-    location.reload();
-})
-// create the unit
-const box = 32;
+(() => {
+  "use strict";
 
-// load images
+  const canvas = document.querySelector("#snake");
+  const context = canvas.getContext("2d");
+  const scoreElement = document.querySelector(".scoreboard span");
+  const gameOverScreen = document.querySelector(".reloader");
+  const finalScoreElement = document.querySelector(".highScore");
+  const restartButton = document.querySelector(".reloading");
 
-const ground = new Image();
-ground.src = "img/ground.png";
+  const CELL_SIZE = 32;
+  const BOARD_SIZE = 608;
+  const TICK_RATE = 100;
+  const BOUNDS = {
+    left: CELL_SIZE,
+    right: 17 * CELL_SIZE,
+    top: 3 * CELL_SIZE,
+    bottom: 17 * CELL_SIZE,
+  };
 
-const foodImg = new Image();
-foodImg.src = "img/food.png";
+  const images = {
+    food: loadImage("img/food.png"),
+    ground: loadImage("img/ground.png"),
+  };
 
-// load audio files
+  const sounds = {
+    dead: loadAudio("audio/dead.mp3"),
+    eat: loadAudio("audio/eat.mp3"),
+    up: loadAudio("audio/up.mp3"),
+    right: loadAudio("audio/right.mp3"),
+    down: loadAudio("audio/down.mp3"),
+    left: loadAudio("audio/left.mp3"),
+  };
 
-let dead = new Audio();
-let eat = new Audio();
-let up = new Audio();
-let right = new Audio();
-let left = new Audio();
-let down = new Audio();
+  const directions = {
+    ArrowUp: { x: 0, y: -1, sound: "up", opposite: "ArrowDown" },
+    ArrowRight: { x: 1, y: 0, sound: "right", opposite: "ArrowLeft" },
+    ArrowDown: { x: 0, y: 1, sound: "down", opposite: "ArrowUp" },
+    ArrowLeft: { x: -1, y: 0, sound: "left", opposite: "ArrowRight" },
+  };
 
-dead.src = "audio/dead.mp3";
-eat.src = "audio/eat.mp3";
-up.src = "audio/up.mp3";
-right.src = "audio/right.mp3";
-left.src = "audio/left.mp3";
-down.src = "audio/down.mp3";
+  let snake;
+  let food;
+  let direction = null;
+  let nextDirection = null;
+  let score = 0;
+  let gameTimer = null;
+  let gameOver = false;
 
-// create the snake
+  function loadImage(source) {
+    const image = new Image();
+    image.src = source;
+    return image;
+  }
 
-let snake = [];
+  function loadAudio(source) {
+    const audio = new Audio(source);
+    audio.preload = "auto";
+    return audio;
+  }
 
-snake[0] = {
-    x : 9 * box,
-    y : 10 * box
-};
+  function playSound(name) {
+    const audio = sounds[name];
+    if (!audio) return;
 
-// create the food
+    // Reset short sound effects so they can play again immediately.
+    audio.currentTime = 0;
+    const playback = audio.play();
+    if (playback) playback.catch(() => {
+      // Browsers may block audio until the user interacts with the page.
+    });
+  }
 
-let food = {
-    x : Math.floor(Math.random()*17+1) * box,
-    y : Math.floor(Math.random()*15+3) * box
-}
+  function randomGridPosition() {
+    return {
+      x: (Math.floor(Math.random() * 17) + 1) * CELL_SIZE,
+      y: (Math.floor(Math.random() * 15) + 3) * CELL_SIZE,
+    };
+  }
 
-// create the score var
+  function positionsMatch(first, second) {
+    return first.x === second.x && first.y === second.y;
+  }
 
-let score = 0;
+  function placeFood() {
+    let position;
 
-//control the snake
+    do {
+      position = randomGridPosition();
+    } while (snake.some((segment) => positionsMatch(segment, position)));
 
-let d;
+    return position;
+  }
 
-document.addEventListener("keydown",direction);
-
-function direction(event){
-    let key = event.keyCode;
-    if( key == 37 && d != "RIGHT"){
-        left.play();
-        d = "LEFT";
-    }else if(key == 38 && d != "DOWN"){
-        d = "UP";
-        up.play();
-    }else if(key == 39 && d != "LEFT"){
-        d = "RIGHT";
-        right.play();
-    }else if(key == 40 && d != "UP"){
-        d = "DOWN";
-        down.play();
+  function resetGame() {
+    if (gameTimer !== null) {
+      clearInterval(gameTimer);
     }
-}
 
-// cheack collision function
-function collision(head,array){
-    for(let i = 0; i < array.length; i++){
-        if(head.x == array[i].x && head.y == array[i].y){
-            return true;
-        }
+    snake = [{ x: 9 * CELL_SIZE, y: 10 * CELL_SIZE }];
+    direction = null;
+    nextDirection = null;
+    score = 0;
+    gameOver = false;
+    food = placeFood();
+
+    scoreElement.textContent = String(score);
+    gameOverScreen.classList.remove("open");
+    render();
+    gameTimer = setInterval(update, TICK_RATE);
+  }
+
+  function handleKeydown(event) {
+    const requestedDirection = directions[event.key];
+    if (!requestedDirection || gameOver) return;
+
+    event.preventDefault();
+
+    const currentDirection = nextDirection || direction;
+    if (currentDirection && requestedDirection.opposite === currentDirection) {
+      return;
     }
-    return false;
-}
 
-// draw everything to the canvas
+    nextDirection = event.key;
+    playSound(requestedDirection.sound);
+  }
 
-function draw(){
-    
-    // ctx.drawImage(ground,0,0);
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, 608, 608);
-    
-    for( let i = 0; i < snake.length ; i++){
-        ctx.fillStyle = ( i == 0 )? "green" : "white";
-        ctx.fillRect(snake[i].x,snake[i].y,box,box);
+  function isOutsideBoard(position) {
+    return (
+      position.x < BOUNDS.left ||
+      position.x > BOUNDS.right ||
+      position.y < BOUNDS.top ||
+      position.y > BOUNDS.bottom
+    );
+  }
 
+  function endGame() {
+    gameOver = true;
+    clearInterval(gameTimer);
+    gameTimer = null;
+
+    finalScoreElement.textContent = `Score: ${score}`;
+    gameOverScreen.classList.add("open");
+    playSound("dead");
+  }
+
+  function update() {
+    if (gameOver) return;
+
+    if (nextDirection) {
+      direction = nextDirection;
+      nextDirection = null;
     }
-    
-    ctx.drawImage(foodImg, food.x, food.y);
-    
-    // old head position
-    let snakeX = snake[0].x;
-    let snakeY = snake[0].y;
-    
-    // which direction
-    if( d == "LEFT") snakeX -= box;
-    if( d == "UP") snakeY -= box;
-    if( d == "RIGHT") snakeX += box;
-    if( d == "DOWN") snakeY += box;
-    
-    // if the snake eats the food
-    if(snakeX == food.x && snakeY == food.y){
-        score++;
-        eat.play();
-        food = {
-            x : Math.floor(Math.random()*17+1) * box,
-            y : Math.floor(Math.random()*15+3) * box
-        }
-        // we don't remove the tail
-    }else{
-        // remove the tail
-        snake.pop();
-    }
-    
-    // add new Head
-    
-    let newHead = {
-        x : snakeX,
-        y : snakeY
-    }
-    
-    // game over
-    
-    if(snakeX < box || snakeX > 17 * box || snakeY < 3*box || snakeY > 17*box || collision(newHead,snake)){
-        clearInterval(game);
-        dead.play();
-        highScore.textContent = `High Score: ${score}`;
-        reloader.classList.add('open');
-    }
-    
-    snake.unshift(newHead);
-    
-    ctx.fillStyle = "white";
-    ctx.font = "35px sans-serif";
-    scoreboard.textContent = score;
-    ctx.fillRect(0, 0, 30*box, 1.6*box)
-}
 
-// call draw function every 100 ms
+    // Wait for the first valid direction before moving.
+    if (!direction) {
+      render();
+      return;
+    }
 
-let game = setInterval(draw,100);
+    const movement = directions[direction];
+    const head = {
+      x: snake[0].x + movement.x * CELL_SIZE,
+      y: snake[0].y + movement.y * CELL_SIZE,
+    };
+    const ateFood = positionsMatch(head, food);
+
+    // The tail moves away on a normal step, so it is not a collision target.
+    const bodyToCheck = ateFood ? snake : snake.slice(0, -1);
+    if (
+      isOutsideBoard(head) ||
+      bodyToCheck.some((segment) => positionsMatch(head, segment))
+    ) {
+      endGame();
+      render();
+      return;
+    }
+
+    snake.unshift(head);
+
+    if (ateFood) {
+      score += 1;
+      scoreElement.textContent = String(score);
+      playSound("eat");
+      food = placeFood();
+    } else {
+      snake.pop();
+    }
+
+    render();
+  }
+
+  function render() {
+    context.fillStyle = "#000";
+    context.fillRect(0, 0, BOARD_SIZE, BOARD_SIZE);
+
+    // Keep the original dark header strip at the top of the playfield.
+    context.fillStyle = "#030327";
+    context.fillRect(0, 0, BOARD_SIZE, 1.6 * CELL_SIZE);
+
+    drawFood();
+    drawSnake();
+  }
+
+  function drawFood() {
+    if (images.food.complete && images.food.naturalWidth > 0) {
+      context.drawImage(images.food, food.x, food.y, CELL_SIZE, CELL_SIZE);
+      return;
+    }
+
+    context.fillStyle = "red";
+    context.beginPath();
+    context.arc(
+      food.x + CELL_SIZE / 2,
+      food.y + CELL_SIZE / 2,
+      CELL_SIZE / 3,
+      0,
+      Math.PI * 2,
+    );
+    context.fill();
+  }
+
+  function drawSnake() {
+    snake.forEach((segment, index) => {
+      context.fillStyle = index === 0 ? "#22c55e" : "#fff";
+      context.fillRect(
+        segment.x,
+        segment.y,
+        CELL_SIZE,
+        CELL_SIZE,
+      );
+
+      // A small gap makes each segment easier to distinguish.
+      context.strokeStyle = "#000";
+      context.strokeRect(
+        segment.x,
+        segment.y,
+        CELL_SIZE,
+        CELL_SIZE,
+      );
+    });
+  }
+
+  document.addEventListener("keydown", handleKeydown);
+  restartButton.addEventListener("click", resetGame);
+
+  resetGame();
+})();
